@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reachability Map</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Turf.js for client-side polygon intersection -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f12;
+      --surface: #13161b;
+      --surface2: #1c2028;
+      --border: #252b35;
+      --accent: #c8f55a;
+      --accent2: #5af5c8;
+      --accent3: #f55a8c;
+      --text: #e8ecf0;
+      --muted: #6b7585;
+      --overlay-bike: rgba(200, 245, 90, 0.18);
+      --overlay-car: rgba(90, 200, 245, 0.18);
+      --overlay-foot: rgba(245, 90, 140, 0.18);
+      --overlay-intersect: rgba(255, 220, 50, 0.35);
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --sidebar-w: 340px;
+      --radius: 10px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      overflow: hidden;
+    }
+
+    /* ─── LAYOUT ─── */
+    #app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    #map-container {
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ─── SIDEBAR HEADER ─── */
+    .sidebar-header {
+      padding: 22px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .sidebar-header h1 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .sidebar-header h1 span {
+      color: var(--accent);
+    }
+
+    .sidebar-header p {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 5px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ─── SIDEBAR BODY ─── */
+    .sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    /* ─── SECTION LABELS ─── */
+    .section-label {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ─── POINTS LIST ─── */
+    .points-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .point-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .point-item:hover {
+      border-color: var(--accent);
+    }
+
+    .point-item.active {
+      border-color: var(--accent);
+      background: rgba(200, 245, 90, 0.05);
+    }
+
+    .point-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .point-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .point-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .point-coords {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .point-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .point-remove:hover {
+      color: var(--accent3);
+      background: rgba(245, 90, 140, 0.1);
+    }
+
+    /* ─── ADD POINT BUTTONS ─── */
+    .add-point-btn {
+      width: 100%;
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .add-point-btn:hover, .add-point-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(200, 245, 90, 0.05);
+    }
+
+    /* ─── TRANSPORT SELECTOR ─── */
+    .transport-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .transport-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 10px 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .transport-btn .transport-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .transport-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .transport-btn.active {
+      border-color: var(--accent);
+      background: rgba(200, 245, 90, 0.08);
+      color: var(--accent);
+    }
+
+    /* ─── TIME SLIDER ─── */
+    .time-control {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .time-display {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .time-value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+
+    .time-unit {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 0 3px rgba(200, 245, 90, 0.2);
+      transition: box-shadow 0.15s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 0 6px rgba(200, 245, 90, 0.2);
+    }
+
+    .time-presets {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .preset-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .preset-btn:hover, .preset-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ─── CALCULATE BUTTON ─── */
+    .calc-btn {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #0d0f12;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 14px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .calc-btn:hover {
+      background: #d4f76e;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(200, 245, 90, 0.25);
+    }
+
+    .calc-btn:active {
+      transform: translateY(0);
+    }
+
+    .calc-btn:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* ─── SAVED SESSIONS ─── */
+    .saved-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .saved-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .saved-item:hover {
+      border-color: var(--accent2);
+    }
+
+    .saved-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .saved-item-name {
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .saved-item-meta {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .saved-item-del {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px;
+      border-radius: 4px;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .saved-item-del:hover { color: var(--accent3); }
+
+    /* ─── SAVE SECTION ─── */
+    .save-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .save-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .save-input:focus {
+      border-color: var(--accent2);
+    }
+
+    .save-input::placeholder {
+      color: var(--muted);
+    }
+
+    .save-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--accent2);
+      font-size: 14px;
+      width: 36px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .save-btn:hover {
+      border-color: var(--accent2);
+      background: rgba(90, 245, 200, 0.08);
+    }
+
+    /* ─── STATUS BAR ─── */
+    #status {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 18px;
+      font-size: 11px;
+      color: var(--muted);
+      pointer-events: none;
+      transition: all 0.3s;
+      z-index: 500;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+    }
+
+    #status.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(13, 15, 18, 0.9);
+    }
+
+    #status.error {
+      color: var(--accent3);
+      border-color: var(--accent3);
+    }
+
+    /* ─── LOADING OVERLAY ─── */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(13,15,18,0.3);
+      border-top-color: #0d0f12;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ─── MODAL ─── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      width: 380px;
+      max-width: 90vw;
+      transform: translateY(12px);
+      transition: transform 0.2s;
+    }
+
+    .modal-backdrop.open .modal {
+      transform: translateY(0);
+    }
+
+    .modal h2 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .modal p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .modal-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 12px;
+    }
+
+    .modal-input:focus {
+      border-color: var(--accent);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .modal-cancel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 9px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .modal-cancel:hover { color: var(--text); border-color: var(--text); }
+
+    .modal-confirm {
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #0d0f12;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .modal-confirm:hover { background: #d4f76e; }
+
+    /* ─── LEAFLET OVERRIDE ─── */
+    .leaflet-container {
+      background: #1a1f28;
+    }
+
+    .leaflet-control-zoom {
+      border: 1px solid var(--border) !important;
+      border-radius: var(--radius) !important;
+      overflow: hidden;
+    }
+
+    .leaflet-control-zoom a {
+      background: var(--surface) !important;
+      color: var(--text) !important;
+      border-bottom: 1px solid var(--border) !important;
+      transition: background 0.15s;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: var(--surface2) !important;
+      color: var(--accent) !important;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(13, 15, 18, 0.8) !important;
+      color: var(--muted) !important;
+      font-size: 8px !important;
+    }
+
+    .leaflet-control-attribution a {
+      color: var(--muted) !important;
+    }
+
+    /* ─── POINT LABEL MARKER ─── */
+    .point-label-marker {
+      background: var(--surface);
+      border: 1.5px solid var(--accent);
+      border-radius: 6px;
+      padding: 3px 7px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    /* ─── LEGEND ─── */
+    #legend {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(13, 15, 18, 0.92);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 10px;
+      z-index: 500;
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 160px;
+    }
+
+    #legend.visible { display: flex; }
+
+    .legend-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+    }
+
+    .legend-swatch {
+      width: 24px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* ─── API KEY NOTICE ─── */
+    #api-notice {
+      background: rgba(245, 90, 140, 0.1);
+      border: 1px solid rgba(245, 90, 140, 0.3);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 10px;
+      color: var(--accent3);
+      line-height: 1.5;
+      display: none;
+    }
+
+    #api-notice.visible { display: block; }
+    #api-notice a { color: var(--accent3); }
+
+    /* ─── API KEY INPUT ─── */
+    .api-key-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .api-key-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid rgba(245, 90, 140, 0.4);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 6px 10px;
+      outline: none;
+    }
+
+    .api-key-input:focus { border-color: var(--accent3); }
+
+    .api-key-save {
+      background: rgba(245, 90, 140, 0.15);
+      border: 1px solid rgba(245, 90, 140, 0.4);
+      border-radius: 6px;
+      color: var(--accent3);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 6px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* ─── EMPTY STATE ─── */
+    .empty-state {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      padding: 12px 8px;
+      line-height: 1.7;
+    }
+
+    /* ─── TOOLTIP ─── */
+    .custom-tooltip {
+      background: var(--surface) !important;
+      border: 1px solid var(--border) !important;
+      color: var(--text) !important;
+      font-family: var(--font-mono) !important;
+      font-size: 11px !important;
+      border-radius: 8px !important;
+      padding: 8px 12px !important;
+    }
+
+    /* ─── MOBILE ─── */
+    @media (max-width: 640px) {
+      #sidebar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 50%;
+        border-right: none;
+        border-top: 1px solid var(--border);
+        z-index: 20;
+      }
+
+      #app { flex-direction: column; }
+      #map-container { flex: 1; }
+    }
+
+    /* ─── SCROLL FADE ─── */
+    .fade-enter {
+      animation: fadeSlide 0.2s ease forwards;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .color-dot-0 { background: #c8f55a; }
+    .color-dot-1 { background: #5af5c8; }
+    .color-dot-2 { background: #f55a8c; }
+    .color-dot-3 { background: #f5c85a; }
+    .color-dot-4 { background: #8c5af5; }
+    .color-dot-5 { background: #5a8cf5; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h1>reach<span>map</span></h1>
+      <p>Isochrone reachability explorer</p>
+    </div>
+
+    <div class="sidebar-body">
+
+      <!-- API Key Notice -->
+      <div id="api-notice">
+        <strong>API key needed.</strong> This tool uses <a href="https://openrouteservice.org/dev/#/signup" target="_blank">OpenRouteService</a> (free). Get your key and enter it below.<br />
+        <div class="api-key-row">
+          <input class="api-key-input" id="api-key-input" type="password" placeholder="Paste ORS API key…" />
+          <button class="api-key-save" onclick="saveApiKey()">Save</button>
+        </div>
+      </div>
+
+      <!-- Points -->
+      <div>
+        <div class="section-label">Target points</div>
+        <div class="points-list" id="points-list">
+          <div class="empty-state">Click the button below, then click on the map to place a point.</div>
+        </div>
+        <button class="add-point-btn" id="add-point-btn" onclick="toggleAddMode()">
+          <span>＋</span> Click map to place point
+        </button>
+      </div>
+
+      <!-- Transport -->
+      <div>
+        <div class="section-label">Transport mode</div>
+        <div class="transport-grid">
+          <button class="transport-btn active" data-mode="cycling-regular" onclick="selectMode(this)">
+            <span class="transport-icon">🚴</span>
+            <span>Bike</span>
+          </button>
+          <button class="transport-btn" data-mode="driving-car" onclick="selectMode(this)">
+            <span class="transport-icon">🚗</span>
+            <span>Car</span>
+          </button>
+          <button class="transport-btn" data-mode="foot-walking" onclick="selectMode(this)">
+            <span class="transport-icon">🚶</span>
+            <span>Walk</span>
+          </button>
+          <button class="transport-btn" data-mode="cycling-road" onclick="selectMode(this)">
+            <span class="transport-icon">🏎️</span>
+            <span>Road bike</span>
+          </button>
+          <button class="transport-btn" data-mode="cycling-electric" onclick="selectMode(this)">
+            <span class="transport-icon">⚡</span>
+            <span>E-Bike</span>
+          </button>
+          <button class="transport-btn" data-mode="foot-hiking" onclick="selectMode(this)">
+            <span class="transport-icon">🥾</span>
+            <span>Hiking</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Time -->
+      <div>
+        <div class="section-label">Max travel time</div>
+        <div class="time-control">
+          <div class="time-display">
+            <span class="time-value" id="time-display">15</span>
+            <span class="time-unit">minutes</span>
+          </div>
+          <input type="range" id="time-slider" min="5" max="120" step="5" value="15"
+            oninput="updateTime(this.value)" />
+          <div class="time-presets">
+            <button class="preset-btn active" onclick="setPreset(15)">15 min</button>
+            <button class="preset-btn" onclick="setPreset(30)">30 min</button>
+            <button class="preset-btn" onclick="setPreset(45)">45 min</button>
+            <button class="preset-btn" onclick="setPreset(60)">1 hr</button>
+            <button class="preset-btn" onclick="setPreset(90)">1.5 hr</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calculate -->
+      <button class="calc-btn" id="calc-btn" onclick="calculate()" disabled>
+        Calculate Reachable Area
+      </button>
+
+      <!-- Save current session -->
+      <div>
+        <div class="section-label">Save setup</div>
+        <div class="save-row">
+          <input class="save-input" id="session-name-input" placeholder="Name this setup…" />
+          <button class="save-btn" onclick="saveSession()" title="Save">💾</button>
+        </div>
+      </div>
+
+      <!-- Saved sessions -->
+      <div>
+        <div class="section-label">Saved setups</div>
+        <div class="saved-list" id="saved-list">
+          <div class="empty-state" id="saved-empty">No saved setups yet.</div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar-body -->
+  </aside>
+
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="status">Click the sidebar to start</div>
+    <div id="legend">
+      <div class="legend-title">Reachable zones</div>
+      <div id="legend-items"></div>
+      <div class="legend-row" id="legend-intersection" style="display:none">
+        <div class="legend-swatch" style="background:rgba(255,220,50,0.6);border:2px solid rgba(255,220,50,0.9)"></div>
+        <span>Common area (all points)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Name Modal -->
+<div class="modal-backdrop" id="name-modal">
+  <div class="modal">
+    <h2>Name this point</h2>
+    <p>Give this location a descriptive name — e.g. "Home", "Work", "Gym".</p>
+    <input class="modal-input" id="modal-name-input" type="text" placeholder="Enter name…" maxlength="40" />
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="cancelModal()">Cancel</button>
+      <button class="modal-confirm" onclick="confirmModal()">Add Point</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const POINT_COLORS = ['#c8f55a', '#5af5c8', '#f55a8c', '#f5c85a', '#8c5af5', '#5a8cf5'];
+const ORS_BASE = 'https://api.openrouteservice.org/v2/isochrones/';
+
+let points = [];           // { id, name, lat, lng, marker, labelMarker }
+let isochroneLayers = [];  // Leaflet layers currently on map
+let addMode = false;
+let pendingPoint = null;   // { lat, lng } waiting for name
+let selectedMode = 'cycling-regular';
+let timeMinutes = 15;
+let apiKey = localStorage.getItem('ors_api_key') || '';
+let sessions = JSON.parse(localStorage.getItem('maptool_sessions') || '[]');
+
+// ═══════════════════════════════════════════════
+// MAP INIT
+// ═══════════════════════════════════════════════
+const map = L.map('map', {
+  center: [51.505, 10.09],
+  zoom: 6,
+  zoomControl: true,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com">CARTO</a>',
+  maxZoom: 19,
+}).addTo(map);
+
+map.on('click', onMapClick);
+
+// ═══════════════════════════════════════════════
+// API KEY
+// ═══════════════════════════════════════════════
+function checkApiKey() {
+  const notice = document.getElementById('api-notice');
+  if (!apiKey) {
+    notice.classList.add('visible');
+    document.getElementById('api-key-input').value = '';
+  } else {
+    notice.classList.remove('visible');
+  }
+}
+
+function saveApiKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  apiKey = val;
+  localStorage.setItem('ors_api_key', apiKey);
+  checkApiKey();
+  setStatus('API key saved ✓', false);
+}
+
+checkApiKey();
+
+// ═══════════════════════════════════════════════
+// MAP INTERACTIONS
+// ═══════════════════════════════════════════════
+function toggleAddMode() {
+  addMode = !addMode;
+  const btn = document.getElementById('add-point-btn');
+  btn.classList.toggle('active', addMode);
+  btn.textContent = addMode ? '↩ Cancel (click map to place)' : '＋ Click map to place point';
+  map.getContainer().style.cursor = addMode ? 'crosshair' : '';
+  if (addMode) setStatus('Click the map to place a point', true);
+  else setStatus('');
+}
+
+function onMapClick(e) {
+  if (!addMode) return;
+  pendingPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
+  openModal();
+}
+
+// ═══════════════════════════════════════════════
+// MODAL (name input)
+// ═══════════════════════════════════════════════
+function openModal() {
+  const modal = document.getElementById('name-modal');
+  const input = document.getElementById('modal-name-input');
+  modal.classList.add('open');
+  input.value = '';
+  setTimeout(() => input.focus(), 100);
+
+  input.addEventListener('keydown', handleModalKey);
+}
+
+function handleModalKey(e) {
+  if (e.key === 'Enter') confirmModal();
+  if (e.key === 'Escape') cancelModal();
+}
+
+function cancelModal() {
+  document.getElementById('name-modal').classList.remove('open');
+  document.getElementById('modal-name-input').removeEventListener('keydown', handleModalKey);
+  pendingPoint = null;
+  if (addMode) toggleAddMode();
+}
+
+function confirmModal() {
+  const input = document.getElementById('modal-name-input');
+  const name = input.value.trim() || `Point ${points.length + 1}`;
+  document.getElementById('name-modal').classList.remove('open');
+  input.removeEventListener('keydown', handleModalKey);
+
+  if (pendingPoint) {
+    addPoint(pendingPoint.lat, pendingPoint.lng, name);
+    pendingPoint = null;
+  }
+
+  if (addMode) toggleAddMode();
+}
+
+// ═══════════════════════════════════════════════
+// POINTS MANAGEMENT
+// ═══════════════════════════════════════════════
+function addPoint(lat, lng, name) {
+  const id = Date.now();
+  const colorIdx = points.length % POINT_COLORS.length;
+  const color = POINT_COLORS[colorIdx];
+
+  // Leaflet marker
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.8);box-shadow:0 0 0 4px ${color}33;"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+  const marker = L.marker([lat, lng], { icon, draggable: true }).addTo(map);
+  marker.on('dragend', () => {
+    const p = points.find(p => p.id === id);
+    if (p) {
+      p.lat = marker.getLatLng().lat;
+      p.lng = marker.getLatLng().lng;
+      if (p.labelMarker) {
+        p.labelMarker.setLatLng([p.lat, p.lng]);
+      }
+      renderPointsList();
+    }
+  });
+
+  const labelIcon = L.divIcon({
+    className: '',
+    html: `<div class="point-label-marker" style="border-color:${color}">${escapeHtml(name)}</div>`,
+    iconSize: null,
+    iconAnchor: [-10, 20],
+  });
+  const labelMarker = L.marker([lat, lng], { icon: labelIcon, interactive: false, zIndexOffset: -1 }).addTo(map);
+
+  const point = { id, name, lat, lng, marker, labelMarker, color, colorIdx };
+  points.push(point);
+  renderPointsList();
+  updateCalcBtn();
+  setStatus(`Point "${name}" added`);
+  map.panTo([lat, lng]);
+}
+
+function removePoint(id) {
+  const idx = points.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  const p = points[idx];
+  p.marker.remove();
+  p.labelMarker.remove();
+  points.splice(idx, 1);
+  renderPointsList();
+  updateCalcBtn();
+  clearIsochrones();
+}
+
+function renderPointsList() {
+  const list = document.getElementById('points-list');
+  if (points.length === 0) {
+    list.innerHTML = '<div class="empty-state">Click the button below, then click on the map to place a point.</div>';
+    return;
+  }
+  list.innerHTML = points.map(p => `
+    <div class="point-item fade-enter" data-id="${p.id}" onclick="focusPoint(${p.id})">
+      <div class="point-dot" style="background:${p.color}"></div>
+      <div class="point-info">
+        <div class="point-name">${escapeHtml(p.name)}</div>
+        <div class="point-coords">${p.lat.toFixed(4)}°, ${p.lng.toFixed(4)}°</div>
+      </div>
+      <button class="point-remove" onclick="event.stopPropagation();removePoint(${p.id})" title="Remove">×</button>
+    </div>
+  `).join('');
+}
+
+function focusPoint(id) {
+  const p = points.find(p => p.id === id);
+  if (p) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 13));
+}
+
+// ═══════════════════════════════════════════════
+// TRANSPORT + TIME
+// ═══════════════════════════════════════════════
+function selectMode(btn) {
+  document.querySelectorAll('.transport-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedMode = btn.dataset.mode;
+}
+
+function updateTime(val) {
+  timeMinutes = parseInt(val);
+  document.getElementById('time-display').textContent = timeMinutes;
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.textContent) === timeMinutes ||
+      (b.textContent === '1 hr' && timeMinutes === 60) ||
+      (b.textContent === '1.5 hr' && timeMinutes === 90));
+  });
+}
+
+function setPreset(val) {
+  timeMinutes = val;
+  document.getElementById('time-slider').value = val;
+  document.getElementById('time-display').textContent = val;
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    const match = (b.textContent === `${val} min`) ||
+      (b.textContent === '1 hr' && val === 60) ||
+      (b.textContent === '1.5 hr' && val === 90);
+    b.classList.toggle('active', match);
+  });
+}
+
+function updateCalcBtn() {
+  const btn = document.getElementById('calc-btn');
+  btn.disabled = points.length === 0;
+}
+
+// ═══════════════════════════════════════════════
+// ISOCHRONE CALCULATION
+// ═══════════════════════════════════════════════
+async function calculate() {
+  if (points.length === 0) return;
+  if (!apiKey) {
+    document.getElementById('api-notice').classList.add('visible');
+    setStatus('Enter your ORS API key first', true);
+    return;
+  }
+
+  const btn = document.getElementById('calc-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Calculating…';
+  clearIsochrones();
+
+  try {
+    const timeSeconds = timeMinutes * 60;
+    // Fetch one isochrone per point — each is a single API call
+    const results = await Promise.all(
+      points.map(p => fetchIsochrone(p.lat, p.lng, selectedMode, timeSeconds))
+    );
+
+    renderIsochrones(results);
+  } catch (err) {
+    setStatus('Error: ' + err.message, false, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Calculate Reachable Area';
+  }
+}
+
+async function fetchIsochrone(lat, lng, mode, seconds) {
+  const url = `${ORS_BASE}${encodeURIComponent(mode)}`;
+  const body = {
+    locations: [[lng, lat]],
+    range: [seconds],
+    range_type: 'time',
+    smoothing: 10,
+  };
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    let msg = `HTTP ${resp.status}`;
+    try {
+      const json = await resp.json();
+      if (json.error) msg = json.error.message || JSON.stringify(json.error);
+    } catch (_) {}
+    throw new Error(msg);
+  }
+
+  return resp.json();
+}
+
+function renderIsochrones(results) {
+  const legend = document.getElementById('legend');
+  const legendItems = document.getElementById('legend-items');
+  legendItems.innerHTML = '';
+
+  const geojsonFeatures = [];
+
+  results.forEach((geojson, i) => {
+    const p = points[i];
+    const feature = geojson.features[0];
+    if (!feature) return;
+
+    // Draw individual isochrone
+    const layer = L.geoJSON(feature, {
+      style: {
+        fillColor: p.color,
+        fillOpacity: 0.15,
+        color: p.color,
+        weight: 2,
+        opacity: 0.7,
+        dashArray: '4 4',
+      },
+    }).addTo(map);
+    isochroneLayers.push(layer);
+    geojsonFeatures.push(feature);
+
+    // Legend row
+    const row = document.createElement('div');
+    row.className = 'legend-row';
+    row.innerHTML = `
+      <div class="legend-swatch" style="background:${p.color};opacity:0.7"></div>
+      <span>${escapeHtml(p.name)}</span>
+    `;
+    legendItems.appendChild(row);
+  });
+
+  // If multiple points, compute intersection client-side via Turf
+  if (geojsonFeatures.length > 1) {
+    try {
+      let intersection = geojsonFeatures[0];
+      for (let i = 1; i < geojsonFeatures.length; i++) {
+        intersection = turf.intersect(intersection, geojsonFeatures[i]);
+        if (!intersection) break;
+      }
+
+      if (intersection) {
+        const intersectLayer = L.geoJSON(intersection, {
+          style: {
+            fillColor: '#ffdc32',
+            fillOpacity: 0.4,
+            color: '#ffdc32',
+            weight: 2.5,
+            opacity: 0.95,
+          },
+        }).addTo(map);
+        isochroneLayers.push(intersectLayer);
+        document.getElementById('legend-intersection').style.display = 'flex';
+      } else {
+        document.getElementById('legend-intersection').style.display = 'none';
+        setStatus('No common reachable area found for all points', false, true);
+      }
+    } catch (e) {
+      document.getElementById('legend-intersection').style.display = 'none';
+    }
+  } else {
+    document.getElementById('legend-intersection').style.display = 'none';
+  }
+
+  // Fit map to all isochrones
+  const allLayers = L.featureGroup(isochroneLayers);
+  map.fitBounds(allLayers.getBounds().pad(0.1));
+
+  legend.classList.add('visible');
+  setStatus(`Showing reachable area within ${timeMinutes} min`);
+}
+
+function clearIsochrones() {
+  isochroneLayers.forEach(l => l.remove());
+  isochroneLayers = [];
+  document.getElementById('legend').classList.remove('visible');
+  document.getElementById('legend-intersection').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════
+// SESSIONS (localStorage)
+// ═══════════════════════════════════════════════
+function saveSession() {
+  if (points.length === 0) {
+    setStatus('Add at least one point first', false, true);
+    return;
+  }
+  const nameInput = document.getElementById('session-name-input');
+  const name = nameInput.value.trim() || `Setup ${sessions.length + 1}`;
+
+  const session = {
+    id: Date.now(),
+    name,
+    mode: selectedMode,
+    time: timeMinutes,
+    points: points.map(p => ({ name: p.name, lat: p.lat, lng: p.lng })),
+    savedAt: new Date().toISOString(),
+  };
+
+  sessions.unshift(session);
+  localStorage.setItem('maptool_sessions', JSON.stringify(sessions));
+  nameInput.value = '';
+  renderSessions();
+  setStatus(`Setup "${name}" saved`);
+}
+
+function loadSession(id) {
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+
+  // Clear current
+  points.forEach(p => { p.marker.remove(); p.labelMarker.remove(); });
+  points = [];
+  clearIsochrones();
+
+  // Load transport + time
+  const modeBtn = document.querySelector(`[data-mode="${session.mode}"]`);
+  if (modeBtn) selectMode(modeBtn);
+  setPreset(session.time);
+
+  // Load points
+  session.points.forEach(p => addPoint(p.lat, p.lng, p.name));
+
+  // Fit view
+  if (points.length > 0) {
+    const group = L.featureGroup(points.map(p => p.marker));
+    map.fitBounds(group.getBounds().pad(0.5));
+  }
+
+  setStatus(`Loaded: ${session.name}`);
+}
+
+function deleteSession(id) {
+  sessions = sessions.filter(s => s.id !== id);
+  localStorage.setItem('maptool_sessions', JSON.stringify(sessions));
+  renderSessions();
+}
+
+function renderSessions() {
+  const list = document.getElementById('saved-list');
+  const empty = document.getElementById('saved-empty');
+
+  if (sessions.length === 0) {
+    list.innerHTML = '<div class="empty-state" id="saved-empty">No saved setups yet.</div>';
+    return;
+  }
+
+  list.innerHTML = sessions.map(s => {
+    const date = new Date(s.savedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    const modeEmoji = { 'cycling-regular': '🚴', 'driving-car': '🚗', 'foot-walking': '🚶', 'cycling-road': '🏎️', 'cycling-electric': '⚡', 'foot-hiking': '🥾' }[s.mode] || '📍';
+    return `
+      <div class="saved-item fade-enter">
+        <div class="saved-item-info" onclick="loadSession(${s.id})" style="cursor:pointer">
+          <div class="saved-item-name">${escapeHtml(s.name)}</div>
+          <div class="saved-item-meta">${modeEmoji} ${s.time} min · ${s.points.length} point${s.points.length !== 1 ? 's' : ''} · ${date}</div>
+        </div>
+        <button class="saved-item-del" onclick="deleteSession(${s.id})" title="Delete">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+renderSessions();
+
+// ═══════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════
+function setStatus(msg, active = false, error = false) {
+  const el = document.getElementById('status');
+  el.textContent = msg || '';
+  el.className = active ? 'active' : error ? 'error' : '';
+  if (!msg) el.textContent = '';
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Re-render map on sidebar interaction 
+window.addEventListener('resize', () => map.invalidateSize());
+
+setStatus('Place points on the map to get started', true);
+</script>
+</body>
+</html>
