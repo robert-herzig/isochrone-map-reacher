@@ -78,21 +78,36 @@
 
     /* ─── LIGHT MODE ─── */
     [data-theme="light"] {
-      --bg: #f0ece2;
-      --surface: #e8e3d7;
-      --surface2: #dcd6c8;
-      --border: #c4bdb0;
-      --text: #18180f;
-      --muted: #7a7060;
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --surface2: #eceae5;
+      --border: #d0ccc4;
+      --accent: #4a7c00;
+      --accent2: #006b52;
+      --accent3: #c0183f;
+      --text: #111008;
+      --muted: #5e584e;
+      --overlay-bike: rgba(74, 124, 0, 0.15);
+      --overlay-car: rgba(0, 107, 82, 0.15);
+      --overlay-foot: rgba(192, 24, 63, 0.15);
     }
 
     [data-theme="light"] .leaflet-tile-pane {
-      filter: brightness(1.05) saturate(0.9);
+      filter: brightness(1.0) saturate(0.95);
     }
 
     [data-theme="light"] .leaflet-control-zoom a {
       background: var(--surface) !important;
       color: var(--text) !important;
+    }
+
+    [data-theme="light"] .leaflet-control-attribution {
+      background: rgba(245, 243, 239, 0.9) !important;
+      color: var(--muted) !important;
+    }
+
+    [data-theme="light"] #status {
+      background: rgba(255,255,255,0.95);
     }
 
     /* ─── SIDEBAR HEADER ─── */
