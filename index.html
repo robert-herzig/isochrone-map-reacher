@@ -76,11 +76,36 @@
       height: 100%;
     }
 
+    /* ─── LIGHT MODE ─── */
+    [data-theme="light"] {
+      --bg: #f0ece2;
+      --surface: #e8e3d7;
+      --surface2: #dcd6c8;
+      --border: #c4bdb0;
+      --text: #18180f;
+      --muted: #7a7060;
+    }
+
+    [data-theme="light"] .leaflet-tile-pane {
+      filter: brightness(1.05) saturate(0.9);
+    }
+
+    [data-theme="light"] .leaflet-control-zoom a {
+      background: var(--surface) !important;
+      color: var(--text) !important;
+    }
+
     /* ─── SIDEBAR HEADER ─── */
     .sidebar-header {
       padding: 22px 20px 16px;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+    }
+
+    .sidebar-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .sidebar-header h1 {
@@ -102,6 +127,40 @@
       margin-top: 5px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
+    }
+
+    .theme-toggle {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      width: 36px;
+      height: 20px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.25s, border-color 0.25s;
+      flex-shrink: 0;
+    }
+
+    .theme-toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: transform 0.25s, background 0.25s;
+    }
+
+    [data-theme="light"] .theme-toggle {
+      background: rgba(200, 245, 90, 0.25);
+      border-color: var(--accent);
+    }
+
+    [data-theme="light"] .theme-toggle::after {
+      transform: translateX(16px);
+      background: var(--accent);
     }
 
     /* ─── SIDEBAR BODY ─── */
@@ -897,7 +956,10 @@
 <div id="app">
   <aside id="sidebar">
     <div class="sidebar-header">
-      <h1>reach<span>map</span></h1>
+      <div class="sidebar-header-top">
+        <h1>reach<span>map</span></h1>
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode"></button>
+      </div>
       <p>Isochrone reachability explorer</p>
     </div>
 
@@ -1053,10 +1115,30 @@ const map = L.map('map', {
   zoomControl: true,
 });
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com">CARTO</a>',
-  maxZoom: 19,
-}).addTo(map);
+const TILES = {
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
+const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com">CARTO</a>';
+let tileLayer = L.tileLayer(TILES.dark, { attribution: TILE_ATTR, maxZoom: 19 }).addTo(map);
+
+// ═══════════════════════════════════════════════
+// THEME TOGGLE
+// ═══════════════════════════════════════════════
+let isDark = localStorage.getItem('maptool_theme') !== 'light';
+
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  tileLayer.setUrl(dark ? TILES.dark : TILES.light);
+  isDark = dark;
+  localStorage.setItem('maptool_theme', dark ? 'dark' : 'light');
+}
+
+function toggleTheme() {
+  applyTheme(!isDark);
+}
+
+applyTheme(isDark);
 
 map.on('click', onMapClick);
 
@@ -1129,35 +1211,20 @@ function selectSearchResult(idx) {
   const lat = parseFloat(r.lat);
   const lng = parseFloat(r.lon);
 
-  // Remove previous fly marker
+  // Clean up any old temp marker
   if (searchFlyMarker) { searchFlyMarker.remove(); searchFlyMarker = null; }
 
-  // Fly to location
-  map.flyTo([lat, lng], 13, { duration: 1.2 });
+  // Fly to location, then open naming modal
+  map.flyTo([lat, lng], 13, { duration: 1.0 });
 
-  // Temporary pin marker
-  const icon = L.divIcon({
-    className: '',
-    html: `<div style="width:12px;height:12px;border-radius:50%;background:var(--accent2);border:2px solid white;box-shadow:0 0 0 4px rgba(90,245,200,0.25);"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-  });
-  searchFlyMarker = L.marker([lat, lng], { icon }).addTo(map)
-    .bindTooltip('Click "+ Click map to place point" then click here, or click this pin to add', { permanent: false });
-
-  // Clicking the temporary pin opens the name modal directly
-  searchFlyMarker.on('click', () => {
-    pendingPoint = { lat, lng };
-    if (searchFlyMarker) { searchFlyMarker.remove(); searchFlyMarker = null; }
-    openModal();
-  });
-
-  // Pre-fill modal name with the place name (short version)
+  // Pre-fill name and open modal — point gets added on confirm
   const shortName = r.name || r.display_name.split(',')[0];
   document.getElementById('modal-name-input').value = shortName;
+  pendingPoint = { lat, lng };
 
   searchInput.value = r.display_name.split(',').slice(0, 2).join(',');
   closeSearch();
+  openModal();
 }
 
 function closeSearch() {
