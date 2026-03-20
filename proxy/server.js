@@ -40,12 +40,15 @@ app.post('/map-tool/api/isochrones/:profile', async (req, res) => {
       headers: {
         'Authorization': ORS_KEY,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'application/json, application/geo+json',
       },
       body,
     });
 
     const data = await response.json();
+    if (!response.ok) {
+      console.error(`ORS ${response.status} for ${profile}:`, JSON.stringify(data));
+    }
     res.status(response.status).json(data);
   } catch (err) {
     console.error('ORS proxy error:', err.message);
