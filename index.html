@@ -813,6 +813,21 @@
       font-size: 16px !important;
     }
 
+    /* ─── LANGUAGE TOGGLE ─── */
+    .lang-btn {
+      background: none;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      font-size: 15px;
+      padding: 2px 3px;
+      border-radius: 6px;
+      opacity: 0.45;
+      transition: opacity 0.15s, border-color 0.15s;
+      line-height: 1;
+    }
+    .lang-btn:hover { opacity: 0.8; }
+    .lang-btn.active { opacity: 1; border-color: var(--border); }
+
     /* ─── GEOCODING SEARCH ─── */
     .search-wrap {
       position: relative;
@@ -984,19 +999,23 @@
     <div class="sidebar-header">
       <div class="sidebar-header-top">
         <h1>reach<span>map</span></h1>
-        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode"></button>
+        <div style="display:flex;gap:3px;align-items:center">
+          <button class="lang-btn" id="lang-de" onclick="setLanguage('de')" title="Deutsch">🇩🇪</button>
+          <button class="lang-btn" id="lang-en" onclick="setLanguage('en')" title="English">🇬🇧</button>
+          <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" style="margin-left:2px"></button>
+        </div>
       </div>
-      <p>Isochrone reachability explorer</p>
+      <p data-i18n="sidebarSubtitle">Isochrone reachability explorer</p>
     </div>
 
     <div class="sidebar-body">
 
       <!-- Geocoding Search -->
       <div>
-        <div class="section-label">Search place</div>
+        <div class="section-label" data-i18n="searchLabel">Search place</div>
         <div class="search-wrap">
           <input class="search-input" id="search-input" type="text" placeholder="City, address, landmark…"
-            autocomplete="off" spellcheck="false" />
+            data-i18n-placeholder="searchPlaceholder" autocomplete="off" spellcheck="false" />
           <span class="search-icon">⌕</span>
           <div class="search-spinner" id="search-spinner"></div>
           <div class="search-results" id="search-results"></div>
@@ -1005,7 +1024,7 @@
 
       <!-- Points -->
       <div>
-        <div class="section-label">Target points</div>
+        <div class="section-label" data-i18n="targetPointsLabel">Target points</div>
         <div class="points-list" id="points-list">
           <div class="empty-state">Click the button below, then click on the map to place a point.</div>
         </div>
@@ -1016,23 +1035,23 @@
 
       <!-- Transport -->
       <div>
-        <div class="section-label">Transport mode</div>
+        <div class="section-label" data-i18n="transportLabel">Transport mode</div>
         <div class="transport-grid">
           <button class="transport-btn active" data-mode="cycling-regular" onclick="selectMode(this)">
             <span class="transport-icon">🚴</span>
-            <span>Bike</span>
+            <span data-i18n="bike">Bike</span>
           </button>
           <button class="transport-btn" data-mode="driving-car" onclick="selectMode(this)">
             <span class="transport-icon">🚗</span>
-            <span>Car</span>
+            <span data-i18n="car">Car</span>
           </button>
           <button class="transport-btn" data-mode="foot-walking" onclick="selectMode(this)">
             <span class="transport-icon">🚶</span>
-            <span>Walk</span>
+            <span data-i18n="walk">Walk</span>
           </button>
           <button class="transport-btn" data-mode="cycling-road" onclick="selectMode(this)">
             <span class="transport-icon">🏎️</span>
-            <span>Road bike</span>
+            <span data-i18n="roadBike">Road bike</span>
           </button>
           <button class="transport-btn" data-mode="cycling-electric" onclick="selectMode(this)">
             <span class="transport-icon">⚡</span>
@@ -1040,11 +1059,11 @@
           </button>
           <button class="transport-btn" data-mode="foot-hiking" onclick="selectMode(this)">
             <span class="transport-icon">🥾</span>
-            <span>Hiking</span>
+            <span data-i18n="hiking">Hiking</span>
           </button>
           <button class="transport-btn transit-btn" data-mode="transit-db" onclick="selectMode(this)" style="grid-column:span 3">
             <span class="transport-icon">🚆</span>
-            <span>DB Public Transport <span style="font-size:8px;opacity:0.7;letter-spacing:0">(Germany)</span></span>
+            <span><span data-i18n="transit">Public transport</span> <span style="font-size:8px;opacity:0.7;letter-spacing:0" data-i18n="transitSubtitle">(Germany-wide)</span></span>
           </button>
         </div>
 
@@ -1063,41 +1082,41 @@
 
       <!-- Time -->
       <div>
-        <div class="section-label">Max travel time</div>
+        <div class="section-label" data-i18n="maxTimeLabel">Max travel time</div>
         <div class="time-control">
           <div class="time-display">
             <span class="time-value" id="time-display">15</span>
-            <span class="time-unit">minutes</span>
+            <span class="time-unit" data-i18n="minutes">minutes</span>
           </div>
           <input type="range" id="time-slider" min="5" max="120" step="5" value="15"
             oninput="updateTime(this.value)" />
           <div class="time-presets">
-            <button class="preset-btn active" onclick="setPreset(15)">15 min</button>
-            <button class="preset-btn" onclick="setPreset(30)">30 min</button>
-            <button class="preset-btn" onclick="setPreset(45)">45 min</button>
-            <button class="preset-btn" onclick="setPreset(60)">1 hr</button>
-            <button class="preset-btn" onclick="setPreset(90)">1.5 hr</button>
+            <button class="preset-btn active" data-preset="15" onclick="setPreset(15)">15 min</button>
+            <button class="preset-btn" data-preset="30" onclick="setPreset(30)">30 min</button>
+            <button class="preset-btn" data-preset="45" onclick="setPreset(45)">45 min</button>
+            <button class="preset-btn" data-preset="60" data-i18n="hrOne" onclick="setPreset(60)">1 hr</button>
+            <button class="preset-btn" data-preset="90" data-i18n="hrOneHalf" onclick="setPreset(90)">1.5 hr</button>
           </div>
         </div>
       </div>
 
       <!-- Calculate -->
-      <button class="calc-btn" id="calc-btn" onclick="calculate()" disabled>
+      <button class="calc-btn" id="calc-btn" onclick="calculate()" disabled data-i18n="calcBtn">
         Calculate Reachable Area
       </button>
 
       <!-- Save current session -->
       <div>
-        <div class="section-label">Save setup</div>
+        <div class="section-label" data-i18n="saveLabel">Save setup</div>
         <div class="save-row">
-          <input class="save-input" id="session-name-input" placeholder="Name this setup…" />
+          <input class="save-input" id="session-name-input" placeholder="Name this setup…" data-i18n-placeholder="savePlaceholder" />
           <button class="save-btn" onclick="saveSession()" title="Save">💾</button>
         </div>
       </div>
 
       <!-- Saved sessions -->
       <div>
-        <div class="section-label">Saved setups</div>
+        <div class="section-label" data-i18n="savedLabel">Saved setups</div>
         <div class="saved-list" id="saved-list">
           <div class="empty-state" id="saved-empty">No saved setups yet.</div>
         </div>
@@ -1110,11 +1129,11 @@
     <div id="map"></div>
     <div id="status">Click the sidebar to start</div>
     <div id="legend">
-      <div class="legend-title">Reachable zones</div>
+      <div class="legend-title" data-i18n="legendTitle">Reachable zones</div>
       <div id="legend-items"></div>
       <div class="legend-row" id="legend-intersection" style="display:none">
         <div class="legend-swatch" style="background:rgba(255,220,50,0.6);border:2px solid rgba(255,220,50,0.9)"></div>
-        <span>Common area (all points)</span>
+        <span data-i18n="legendCommon">Common area (all points)</span>
       </div>
     </div>
   </div>
@@ -1123,12 +1142,12 @@
 <!-- Name Modal -->
 <div class="modal-backdrop" id="name-modal">
   <div class="modal">
-    <h2>Name this point</h2>
-    <p>Give this location a descriptive name — e.g. "Home", "Work", "Gym".</p>
-    <input class="modal-input" id="modal-name-input" type="text" placeholder="Enter name…" maxlength="40" />
+    <h2 data-i18n="modalTitle">Name this point</h2>
+    <p data-i18n="modalDesc">Give this location a descriptive name — e.g. "Home", "Work", "Gym".</p>
+    <input class="modal-input" id="modal-name-input" type="text" placeholder="Enter name…" maxlength="40" data-i18n-placeholder="modalPlaceholder" />
     <div class="modal-actions">
-      <button class="modal-cancel" onclick="cancelModal()">Cancel</button>
-      <button class="modal-confirm" onclick="confirmModal()">Add Point</button>
+      <button class="modal-cancel" onclick="cancelModal()" data-i18n="modalCancel">Cancel</button>
+      <button class="modal-confirm" onclick="confirmModal()" data-i18n="modalConfirm">Add Point</button>
     </div>
   </div>
 </div>
@@ -1139,6 +1158,119 @@
 // ═══════════════════════════════════════════════
 const POINT_COLORS = ['#c8f55a', '#5af5c8', '#f55a8c', '#f5c85a', '#8c5af5', '#5a8cf5'];
 const ORS_PROXY = '/map-tool/api/isochrones/';
+
+// ═══════════════════════════════════════════════
+// INTERNATIONALISATION (EN / DE)
+// ═══════════════════════════════════════════════
+const I18N = {
+  en: {
+    sidebarSubtitle: 'Isochrone reachability explorer',
+    searchLabel: 'Search place',
+    searchPlaceholder: 'City, address, landmark…',
+    targetPointsLabel: 'Target points',
+    emptyPoints: 'Click the button below, then click on the map to place a point.',
+    addPointBtn: '\uff0b Click map to place point',
+    cancelAddBtn: '\u21a9 Cancel (click map to place)',
+    transportLabel: 'Transport mode',
+    bike: 'Bike', car: 'Car', walk: 'Walk', roadBike: 'Road bike', hiking: 'Hiking',
+    transit: 'Public transport', transitSubtitle: '(Germany-wide)',
+    transitInfo: '\ud83d\udca1 Shows areas you can commute FROM to reach each point. Via Transitous/MOTIS — full Germany \u00d6PNV. Takes ~15\u201330s.',
+    departureLabel: 'Departure time', departureNow: 'Now',
+    maxTimeLabel: 'Max travel time', minutes: 'minutes',
+    hrOne: '1 hr', hrOneHalf: '1.5 hr',
+    calcBtn: 'Calculate Reachable Area',
+    saveLabel: 'Save setup', savePlaceholder: 'Name this setup…',
+    savedLabel: 'Saved setups', noSaved: 'No saved setups yet.',
+    legendTitle: 'Reachable zones', legendCommon: 'Common area (all points)',
+    modalTitle: 'Name this point',
+    modalDesc: 'Give this location a descriptive name \u2014 e.g. "Home", "Work", "Gym".',
+    modalPlaceholder: 'Enter name…', modalCancel: 'Cancel', modalConfirm: 'Add Point',
+    statusStart: 'Place points on the map to get started',
+    statusCalculating: 'Calculating…',
+    statusNoCommon: 'No common reachable area found for all points',
+    statusShowingArea: min => `Showing reachable area within ${min} min`,
+    statusTransitQuerying: (done, total) => `Querying transit… ${done}/${total}`,
+    statusTransitDone: total => `\ud83d\ude86 Transit isochrone ready \u2014 ${total} reachable zones`,
+    statusPointAdded: name => `Point "${name}" added`,
+    statusSaved: name => `Setup "${name}" saved`,
+    statusLoaded: name => `Loaded: ${name}`,
+    statusAddFirst: 'Add at least one point first',
+    statusNoResults: 'No results found',
+    statusSearchUnavail: 'Search unavailable',
+    statusAddHere: '+ Add point here',
+    statusClickMap: 'Click the map to place a point',
+    savedMeta: (emoji, min, n, date) => `${emoji} ${min} min \u00b7 ${n} pt${n !== 1 ? 's' : ''} \u00b7 ${date}`,
+  },
+  de: {
+    sidebarSubtitle: 'Erreichbarkeits-Explorer',
+    searchLabel: 'Ort suchen',
+    searchPlaceholder: 'Stadt, Adresse, Ort…',
+    targetPointsLabel: 'Zielpunkte',
+    emptyPoints: 'Klicke unten auf den Button, dann auf die Karte.',
+    addPointBtn: '\uff0b Auf Karte klicken',
+    cancelAddBtn: '\u21a9 Abbrechen (Karte anklicken)',
+    transportLabel: 'Verkehrsmittel',
+    bike: 'Fahrrad', car: 'Auto', walk: 'Fu\u00df', roadBike: 'Rennrad', hiking: 'Wandern',
+    transit: '\u00d6ffentlicher Nahverkehr', transitSubtitle: '(Deutschlandweit)',
+    transitInfo: '\ud83d\udca1 Zeigt Gebiete, von denen du jeden Zielpunkt per \u00d6PNV erreichst. Via Transitous/MOTIS \u2014 ganz Deutschland. Dauert ~15\u201330 Sek.',
+    departureLabel: 'Abfahrtszeit', departureNow: 'Jetzt',
+    maxTimeLabel: 'Max. Reisezeit', minutes: 'Minuten',
+    hrOne: '1 Std.', hrOneHalf: '1,5 Std.',
+    calcBtn: 'Erreichbares Gebiet berechnen',
+    saveLabel: 'Setup speichern', savePlaceholder: 'Setup benennen…',
+    savedLabel: 'Gespeicherte Setups', noSaved: 'Noch keine gespeicherten Setups.',
+    legendTitle: 'Erreichbare Zonen', legendCommon: 'Gemeinsame Fl\u00e4che (alle Punkte)',
+    modalTitle: 'Punkt benennen',
+    modalDesc: 'Gib einen beschreibenden Namen ein \u2013 z.B. \u201eZuhause\u201c, \u201eArbeit\u201c, \u201eGym\u201c.',
+    modalPlaceholder: 'Name eingeben…', modalCancel: 'Abbrechen', modalConfirm: 'Punkt hinzuf\u00fcgen',
+    statusStart: 'Punkte auf der Karte setzen',
+    statusCalculating: 'Berechne…',
+    statusNoCommon: 'Kein gemeinsames Gebiet f\u00fcr alle Punkte gefunden',
+    statusShowingArea: min => `Erreichbares Gebiet f\u00fcr ${min} Min.`,
+    statusTransitQuerying: (done, total) => `\u00d6PNV-Verbindungen abfragen… ${done}/${total}`,
+    statusTransitDone: total => `\ud83d\ude86 \u00d6PNV-Isochronen fertig \u2014 ${total} erreichbare Zonen`,
+    statusPointAdded: name => `Punkt \u201e${name}\u201c hinzugef\u00fcgt`,
+    statusSaved: name => `Setup \u201e${name}\u201c gespeichert`,
+    statusLoaded: name => `Geladen: ${name}`,
+    statusAddFirst: 'F\u00fcge zuerst mindestens einen Punkt hinzu',
+    statusNoResults: 'Keine Ergebnisse gefunden',
+    statusSearchUnavail: 'Suche nicht verf\u00fcgbar',
+    statusAddHere: '+ Punkt hinzuf\u00fcgen',
+    statusClickMap: 'Klicke auf die Karte, um einen Punkt zu setzen',
+    savedMeta: (emoji, min, n, date) => `${emoji} ${min} Min. \u00b7 ${n} Pkt${n !== 1 ? 'e' : ''} \u00b7 ${date}`,
+  },
+};
+
+let lang = localStorage.getItem('maptool_lang') || 'de';
+
+function t(key, ...args) {
+  const val = (I18N[lang] ?? I18N.en)[key] ?? I18N.en[key] ?? key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+  document.getElementById('lang-de').classList.toggle('active', lang === 'de');
+  // Update dynamic-text elements
+  const addBtn = document.getElementById('add-point-btn');
+  if (addBtn && !addMode) addBtn.innerHTML = `<span>\uff0b</span> ${t('addPointBtnText') || t('addPointBtn').replace('\uff0b ', '')}`;
+  if (points.length === 0) {
+    document.getElementById('points-list').innerHTML = `<div class="empty-state">${t('emptyPoints')}</div>`;
+  }
+  renderSessions();
+}
+
+function setLanguage(l) {
+  lang = l;
+  localStorage.setItem('maptool_lang', l);
+  applyLang();
+}
 
 let points = [];           // { id, name, lat, lng, marker, labelMarker }
 let isochroneLayers = [];  // Leaflet layers currently on map
@@ -1218,7 +1350,7 @@ async function geocode(q) {
     const results = await resp.json();
     renderSearchResults(results);
   } catch (_) {
-    searchResults.innerHTML = '<div class="search-no-results">Search unavailable</div>';
+    searchResults.innerHTML = `<div class="search-no-results">${t('statusSearchUnavail')}</div>`;
     searchResults.classList.add('open');
   } finally {
     searchSpinner.classList.remove('active');
@@ -1227,7 +1359,7 @@ async function geocode(q) {
 
 function renderSearchResults(results) {
   if (!results.length) {
-    searchResults.innerHTML = '<div class="search-no-results">No results found</div>';
+    searchResults.innerHTML = `<div class="search-no-results">${t('statusNoResults')}</div>`;
     searchResults.classList.add('open');
     return;
   }
@@ -1238,7 +1370,7 @@ function renderSearchResults(results) {
       <div style="flex:1">
         <div class="search-result-name">${escapeHtml(name)}</div>
         <div class="search-result-type">${escapeHtml(type)}</div>
-        <div class="search-result-add">+ Add point here</div>
+        <div class="search-result-add">${t('statusAddHere')}</div>
       </div>
     </div>`;
   }).join('');
@@ -1280,9 +1412,11 @@ function toggleAddMode() {
   addMode = !addMode;
   const btn = document.getElementById('add-point-btn');
   btn.classList.toggle('active', addMode);
-  btn.textContent = addMode ? '↩ Cancel (click map to place)' : '＋ Click map to place point';
+  btn.innerHTML = addMode
+    ? `<span>\u21a9</span> ${t('cancelAddBtn').replace('\u21a9 ', '')}`
+    : `<span>\uff0b</span> ${t('addPointBtn').replace('\uff0b ', '')}`;
   map.getContainer().style.cursor = addMode ? 'crosshair' : '';
-  if (addMode) setStatus('Click the map to place a point', true);
+  if (addMode) setStatus(t('statusClickMap'), true);
   else setStatus('');
 }
 
@@ -1371,7 +1505,7 @@ function addPoint(lat, lng, name) {
   points.push(point);
   renderPointsList();
   updateCalcBtn();
-  setStatus(`Point "${name}" added`);
+  setStatus(t('statusPointAdded', name));
   map.panTo([lat, lng]);
 }
 
@@ -1390,7 +1524,7 @@ function removePoint(id) {
 function renderPointsList() {
   const list = document.getElementById('points-list');
   if (points.length === 0) {
-    list.innerHTML = '<div class="empty-state">Click the button below, then click on the map to place a point.</div>';
+    list.innerHTML = `<div class="empty-state">${t('emptyPoints')}</div>`;
     return;
   }
   list.innerHTML = points.map(p => `
@@ -1438,10 +1572,8 @@ function setDepartureNow() {
 function updateTime(val) {
   timeMinutes = parseInt(val);
   document.getElementById('time-display').textContent = timeMinutes;
-  document.querySelectorAll('.preset-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.textContent) === timeMinutes ||
-      (b.textContent === '1 hr' && timeMinutes === 60) ||
-      (b.textContent === '1.5 hr' && timeMinutes === 90));
+  document.querySelectorAll('.preset-btn[data-preset]').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.preset) === timeMinutes);
   });
 }
 
@@ -1449,11 +1581,8 @@ function setPreset(val) {
   timeMinutes = val;
   document.getElementById('time-slider').value = val;
   document.getElementById('time-display').textContent = val;
-  document.querySelectorAll('.preset-btn').forEach(b => {
-    const match = (b.textContent === `${val} min`) ||
-      (b.textContent === '1 hr' && val === 60) ||
-      (b.textContent === '1.5 hr' && val === 90);
-    b.classList.toggle('active', match);
+  document.querySelectorAll('.preset-btn[data-preset]').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.preset) === val);
   });
 }
 
@@ -1491,54 +1620,80 @@ async function calculate() {
   }
 }
 
-// ── Transit (DB) calculation ──────────────────────────────────
-async function calculateTransit() {
-  // Get departure time
-  const dtInput = document.getElementById('departure-time').value;
-  const whenISO = dtInput ? new Date(dtInput).toISOString() : new Date().toISOString();
+// ── Transit isochrone via MOTIS/Transitous (Germany-wide, all local transit) ─
+// Strategy: generate a hex grid of candidate "home" locations around each
+// user-placed point (= work/destination). Query MOTIS for travel time from
+// each candidate to the destination. Reachable candidates form the isochrone.
+const MOTIS_API = 'https://europe.motis-project.de/api/v1/plan';
 
-  setStatus(`Querying Deutsche Bahn… (may take 5–10s)`, true);
-
-  // One Hafas call + one ORS walking call per point — parallel across points
-  const perPointResults = await Promise.all(points.map(async (p, i) => {
-    const [transitData, walkData] = await Promise.all([
-      fetchTransitIsochrone(p.lat, p.lng, timeMinutes, whenISO),
-      fetchIsochrone(p.lat, p.lng, 'foot-walking', timeMinutes * 60),
-    ]);
-    return { point: p, transitData, walkData };
-  }));
-
-  renderTransitIsochrones(perPointResults);
-}
-
-async function fetchTransitIsochrone(lat, lng, totalMinutes, when) {
-  const resp = await fetch('/map-tool/api/transit-isochrone', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lng, totalMinutes, when }),
-  });
-  if (!resp.ok) {
-    const j = await resp.json().catch(() => ({}));
-    throw new Error(j.error || `HTTP ${resp.status}`);
+/** Generate a hex grid of points within radiusKm around a center. */
+function generateHexGrid(centerLat, centerLng, radiusKm, spacingKm) {
+  const KM_PER_DEG_LAT = 111.195;
+  const kmPerDegLng = KM_PER_DEG_LAT * Math.cos(centerLat * Math.PI / 180);
+  const pts = [];
+  const rows = Math.ceil(radiusKm / spacingKm) + 1;
+  for (let r = -rows; r <= rows; r++) {
+    for (let c = -rows; c <= rows; c++) {
+      const lat = centerLat + (r + 0.5 * (Math.abs(c) % 2)) * spacingKm / KM_PER_DEG_LAT;
+      const lng = centerLng + c * spacingKm / kmPerDegLng;
+      const dlat = (lat - centerLat) * KM_PER_DEG_LAT;
+      const dlng = (lng - centerLng) * kmPerDegLng;
+      if (Math.sqrt(dlat * dlat + dlng * dlng) <= radiusKm) pts.push({ lat, lng });
+    }
   }
-  return resp.json();
+  return pts;
 }
 
-// Walk speed for last-mile circles: 80 m/min = 4.8 km/h
-const WALK_MPS = 80;
+/** Query MOTIS: travel time in seconds from (fromLat,fromLng) → (toLat,toLng). Returns Infinity if unreachable. */
+async function queryMOTIS(fromLat, fromLng, toLat, toLng) {
+  try {
+    const url = `${MOTIS_API}?fromPlace=${fromLat.toFixed(5)},${fromLng.toFixed(5)}&toPlace=${toLat.toFixed(5)},${toLng.toFixed(5)}&numItineraries=1&mode=TRANSIT,WALK`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
+    if (!r.ok) return Infinity;
+    const d = await r.json();
+    return d.itineraries?.[0]?.duration ?? Infinity; // seconds
+  } catch { return Infinity; }
+}
 
-function buildTransitUnion(stops) {
-  if (!stops.length) return null;
-  // Build circles around each reachable stop, union them
-  const circles = stops.map(s =>
-    turf.circle([s.lng, s.lat], s.remainingMinutes * WALK_MPS, { units: 'meters', steps: 32 })
-  );
-  // Union iteratively
-  let union = circles[0];
-  for (let i = 1; i < circles.length; i++) {
-    try { union = turf.union(union, circles[i]) || union; } catch (_) {}
+/** Union-buffer all reachable grid points into one polygon. */
+function buildGridPolygon(pts, spacingKm) {
+  if (!pts.length) return null;
+  const bufR = spacingKm * 0.75;
+  let union = turf.circle([pts[0].lng, pts[0].lat], bufR, { units: 'kilometers', steps: 16 });
+  for (let i = 1; i < pts.length; i++) {
+    const c = turf.circle([pts[i].lng, pts[i].lat], bufR, { units: 'kilometers', steps: 16 });
+    try { union = turf.union(union, c) || union; } catch (_) {}
   }
   return union;
+}
+
+async function calculateTransit() {
+  const limitSec = timeMinutes * 60;
+  // Local transit: ~40 km/h avg (accounting for wait + walk); cap radius at 45 km
+  const radiusKm = Math.min(timeMinutes * 0.67 + 5, 45);
+  const spacingKm = Math.max(2, parseFloat((radiusKm / 5).toFixed(1)));
+
+  const perPointResults = [];
+  for (const p of points) {
+    const grid = generateHexGrid(p.lat, p.lng, radiusKm, spacingKm);
+    let done = 0;
+    setStatus(`Querying ${grid.length} locations for "${p.name}"…`, true);
+
+    // Query MOTIS: from each candidate home point TO the user's work/destination point
+    const durations = await Promise.all(
+      grid.map(pt => queryMOTIS(pt.lat, pt.lng, p.lat, p.lng).then(d => {
+        done++;
+        if (done % 10 === 0 || done === grid.length)
+          setStatus(`${t('statusTransitQuerying', done, grid.length)}`, true);
+        return d;
+      }))
+    );
+
+    const reachable = grid.filter((_, i) => durations[i] <= limitSec);
+    perPointResults.push({ point: p, reachable, spacingKm });
+  }
+
+  renderTransitIsochrones(perPointResults);
 }
 
 function renderTransitIsochrones(perPointResults) {
@@ -1546,58 +1701,31 @@ function renderTransitIsochrones(perPointResults) {
   const legendItems = document.getElementById('legend-items');
   legendItems.innerHTML = '';
 
-  const transitPolygons = []; // one polygon per point (for intersection)
+  const polygons = [];
+  perPointResults.forEach(({ point: p, reachable, spacingKm }) => {
+    const poly = buildGridPolygon(reachable, spacingKm);
+    if (!poly) return;
+    polygons.push(poly);
 
-  perPointResults.forEach(({ point: p, transitData, walkData }) => {
-    // Walking isochrone from origin
-    const walkFeature = walkData?.features?.[0];
-    // Transit union of destination circles
-    const transitUnion = buildTransitUnion(transitData.stops || []);
+    const layer = L.geoJSON(poly, {
+      style: { fillColor: p.color, fillOpacity: 0.18, color: p.color, weight: 2, opacity: 0.8 },
+    }).addTo(map);
+    isochroneLayers.push(layer);
 
-    // Combine walk + transit into one polygon for this point
-    let combined = walkFeature || null;
-    if (transitUnion && combined) {
-      try { combined = turf.union(combined, transitUnion) || combined; } catch (_) {}
-    } else if (transitUnion) {
-      combined = transitUnion;
-    }
-
-    if (!combined) return;
-    transitPolygons.push(combined);
-
-    // Draw walk zone (dashed, dim)
-    if (walkFeature) {
-      const walkLayer = L.geoJSON(walkFeature, {
-        style: { fillColor: p.color, fillOpacity: 0.08, color: p.color, weight: 1.5, opacity: 0.5, dashArray: '3 5' },
-      }).addTo(map);
-      isochroneLayers.push(walkLayer);
-    }
-
-    // Draw transit union (solid, more vivid)
-    if (transitUnion) {
-      const transitLayer = L.geoJSON(transitUnion, {
-        style: { fillColor: p.color, fillOpacity: 0.18, color: p.color, weight: 2, opacity: 0.8 },
-      }).addTo(map);
-      isochroneLayers.push(transitLayer);
-    }
-
-    // Legend
     const row = document.createElement('div');
     row.className = 'legend-row';
-    const stopCount = transitData.stops?.length ?? 0;
     row.innerHTML = `
       <div class="legend-swatch" style="background:${p.color};opacity:0.7"></div>
-      <span>${escapeHtml(p.name)} <span style="color:var(--muted);font-size:9px">(${stopCount} stops)</span></span>
+      <span>${escapeHtml(p.name)} <span style="color:var(--muted);font-size:9px">(${reachable.length} zones)</span></span>
     `;
     legendItems.appendChild(row);
   });
 
-  // Intersection across multiple points
-  if (transitPolygons.length > 1) {
+  if (polygons.length > 1) {
     try {
-      let intersection = transitPolygons[0];
-      for (let i = 1; i < transitPolygons.length; i++) {
-        intersection = turf.intersect(intersection, transitPolygons[i]);
+      let intersection = polygons[0];
+      for (let i = 1; i < polygons.length; i++) {
+        intersection = turf.intersect(intersection, polygons[i]);
         if (!intersection) break;
       }
       if (intersection) {
@@ -1608,7 +1736,7 @@ function renderTransitIsochrones(perPointResults) {
         document.getElementById('legend-intersection').style.display = 'flex';
       } else {
         document.getElementById('legend-intersection').style.display = 'none';
-        setStatus('No common reachable area found', false, true);
+        setStatus(t('statusNoCommon'), false, true);
       }
     } catch (_) {
       document.getElementById('legend-intersection').style.display = 'none';
@@ -1617,12 +1745,10 @@ function renderTransitIsochrones(perPointResults) {
     document.getElementById('legend-intersection').style.display = 'none';
   }
 
-  if (isochroneLayers.length) {
-    map.fitBounds(L.featureGroup(isochroneLayers).getBounds().pad(0.1));
-  }
+  if (isochroneLayers.length) map.fitBounds(L.featureGroup(isochroneLayers).getBounds().pad(0.1));
   legend.classList.add('visible');
-  const total = perPointResults.reduce((s, r) => s + (r.transitData.stops?.length ?? 0), 0);
-  setStatus(`🚆 ${total} reachable stops within ${timeMinutes} min`);
+  const total = perPointResults.reduce((s, r) => s + r.reachable.length, 0);
+  setStatus(t('statusTransitDone', total));
 }
 
 async function fetchIsochrone(lat, lng, mode, seconds) {
@@ -1714,7 +1840,7 @@ function renderIsochrones(results) {
         document.getElementById('legend-intersection').style.display = 'flex';
       } else {
         document.getElementById('legend-intersection').style.display = 'none';
-        setStatus('No common reachable area found for all points', false, true);
+        setStatus(t('statusNoCommon'), false, true);
       }
     } catch (e) {
       document.getElementById('legend-intersection').style.display = 'none';
@@ -1728,7 +1854,7 @@ function renderIsochrones(results) {
   map.fitBounds(allLayers.getBounds().pad(0.1));
 
   legend.classList.add('visible');
-  setStatus(`Showing reachable area within ${timeMinutes} min`);
+  setStatus(t('statusShowingArea', timeMinutes));
 }
 
 function clearIsochrones() {
@@ -1743,7 +1869,7 @@ function clearIsochrones() {
 // ═══════════════════════════════════════════════
 function saveSession() {
   if (points.length === 0) {
-    setStatus('Add at least one point first', false, true);
+    setStatus(t('statusAddFirst'), false, true);
     return;
   }
   const nameInput = document.getElementById('session-name-input');
@@ -1762,7 +1888,7 @@ function saveSession() {
   localStorage.setItem('maptool_sessions', JSON.stringify(sessions));
   nameInput.value = '';
   renderSessions();
-  setStatus(`Setup "${name}" saved`);
+  setStatus(t('statusSaved', name));
 }
 
 function loadSession(id) {
@@ -1788,7 +1914,7 @@ function loadSession(id) {
     map.fitBounds(group.getBounds().pad(0.5));
   }
 
-  setStatus(`Loaded: ${session.name}`);
+  setStatus(t('statusLoaded', session.name));
 }
 
 function deleteSession(id) {
@@ -1802,18 +1928,19 @@ function renderSessions() {
   const empty = document.getElementById('saved-empty');
 
   if (sessions.length === 0) {
-    list.innerHTML = '<div class="empty-state" id="saved-empty">No saved setups yet.</div>';
+    list.innerHTML = `<div class="empty-state" id="saved-empty">${t('noSaved')}</div>`;
     return;
   }
 
   list.innerHTML = sessions.map(s => {
-    const date = new Date(s.savedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    const modeEmoji = { 'cycling-regular': '🚴', 'driving-car': '🚗', 'foot-walking': '🚶', 'cycling-road': '🏎️', 'cycling-electric': '⚡', 'foot-hiking': '🥾' }[s.mode] || '📍';
+    const locale = lang === 'de' ? 'de-DE' : 'en-GB';
+    const date = new Date(s.savedAt).toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+    const modeEmoji = { 'cycling-regular': '🚴', 'driving-car': '🚗', 'foot-walking': '🚶', 'cycling-road': '🏎️', 'cycling-electric': '⚡', 'foot-hiking': '🥾', 'transit-db': '🚆' }[s.mode] || '📍';
     return `
       <div class="saved-item fade-enter">
         <div class="saved-item-info" onclick="loadSession(${s.id})" style="cursor:pointer">
           <div class="saved-item-name">${escapeHtml(s.name)}</div>
-          <div class="saved-item-meta">${modeEmoji} ${s.time} min · ${s.points.length} point${s.points.length !== 1 ? 's' : ''} · ${date}</div>
+          <div class="saved-item-meta">${t('savedMeta', modeEmoji, s.time, s.points.length, date)}</div>
         </div>
         <button class="saved-item-del" onclick="deleteSession(${s.id})" title="Delete">×</button>
       </div>
@@ -1845,7 +1972,8 @@ function escapeHtml(str) {
 // Re-render map on sidebar interaction 
 window.addEventListener('resize', () => map.invalidateSize());
 
-setStatus('Place points on the map to get started', true);
+applyLang();
+setStatus(t('statusStart'), true);
 </script>
 </body>
 </html>
