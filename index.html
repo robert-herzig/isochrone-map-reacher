@@ -802,6 +802,17 @@
       flex-shrink: 0;
     }
 
+    /* ─── TRANSIT BUTTON FULL WIDTH ─── */
+    .transit-btn {
+      justify-content: center;
+      flex-direction: row !important;
+      gap: 8px !important;
+    }
+
+    .transit-btn .transport-icon {
+      font-size: 16px !important;
+    }
+
     /* ─── GEOCODING SEARCH ─── */
     .search-wrap {
       position: relative;
@@ -1031,6 +1042,22 @@
             <span class="transport-icon">🥾</span>
             <span>Hiking</span>
           </button>
+          <button class="transport-btn transit-btn" data-mode="transit-db" onclick="selectMode(this)" style="grid-column:span 3">
+            <span class="transport-icon">🚆</span>
+            <span>DB Public Transport <span style="font-size:8px;opacity:0.7;letter-spacing:0">(Germany)</span></span>
+          </button>
+        </div>
+
+        <!-- Transit departure time — only visible in transit mode -->
+        <div id="transit-options" style="display:none;margin-top:10px">
+          <div class="section-label" style="margin-bottom:6px">Departure time</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="datetime-local" id="departure-time" class="save-input" style="flex:1;font-size:10px" />
+            <button class="preset-btn" onclick="setDepartureNow()" style="white-space:nowrap">Now</button>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:5px;line-height:1.5">
+            💡 Walk-to-station time is included. Last-mile walking estimated at 4.8 km/h.
+          </div>
         </div>
       </div>
 
@@ -1390,6 +1417,22 @@ function selectMode(btn) {
   document.querySelectorAll('.transport-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   selectedMode = btn.dataset.mode;
+  // Show/hide transit options
+  const transitOpts = document.getElementById('transit-options');
+  if (selectedMode === 'transit-db') {
+    transitOpts.style.display = 'block';
+    setDepartureNow();
+  } else {
+    transitOpts.style.display = 'none';
+  }
+}
+
+function setDepartureNow() {
+  // datetime-local needs format: YYYY-MM-DDTHH:MM
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  document.getElementById('departure-time').value = local;
 }
 
 function updateTime(val) {
@@ -1431,19 +1474,155 @@ async function calculate() {
   clearIsochrones();
 
   try {
-    const timeSeconds = timeMinutes * 60;
-    // Fetch one isochrone per point — each is a single API call
-    const results = await Promise.all(
-      points.map(p => fetchIsochrone(p.lat, p.lng, selectedMode, timeSeconds))
-    );
-
-    renderIsochrones(results);
+    if (selectedMode === 'transit-db') {
+      await calculateTransit();
+    } else {
+      const timeSeconds = timeMinutes * 60;
+      const results = await Promise.all(
+        points.map(p => fetchIsochrone(p.lat, p.lng, selectedMode, timeSeconds))
+      );
+      renderIsochrones(results);
+    }
   } catch (err) {
     setStatus('Error: ' + err.message, false, true);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Calculate Reachable Area';
   }
+}
+
+// ── Transit (DB) calculation ──────────────────────────────────
+async function calculateTransit() {
+  // Get departure time
+  const dtInput = document.getElementById('departure-time').value;
+  const whenISO = dtInput ? new Date(dtInput).toISOString() : new Date().toISOString();
+
+  setStatus(`Querying Deutsche Bahn… (may take 5–10s)`, true);
+
+  // One Hafas call + one ORS walking call per point — parallel across points
+  const perPointResults = await Promise.all(points.map(async (p, i) => {
+    const [transitData, walkData] = await Promise.all([
+      fetchTransitIsochrone(p.lat, p.lng, timeMinutes, whenISO),
+      fetchIsochrone(p.lat, p.lng, 'foot-walking', timeMinutes * 60),
+    ]);
+    return { point: p, transitData, walkData };
+  }));
+
+  renderTransitIsochrones(perPointResults);
+}
+
+async function fetchTransitIsochrone(lat, lng, totalMinutes, when) {
+  const resp = await fetch('/map-tool/api/transit-isochrone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat, lng, totalMinutes, when }),
+  });
+  if (!resp.ok) {
+    const j = await resp.json().catch(() => ({}));
+    throw new Error(j.error || `HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+// Walk speed for last-mile circles: 80 m/min = 4.8 km/h
+const WALK_MPS = 80;
+
+function buildTransitUnion(stops) {
+  if (!stops.length) return null;
+  // Build circles around each reachable stop, union them
+  const circles = stops.map(s =>
+    turf.circle([s.lng, s.lat], s.remainingMinutes * WALK_MPS, { units: 'meters', steps: 32 })
+  );
+  // Union iteratively
+  let union = circles[0];
+  for (let i = 1; i < circles.length; i++) {
+    try { union = turf.union(union, circles[i]) || union; } catch (_) {}
+  }
+  return union;
+}
+
+function renderTransitIsochrones(perPointResults) {
+  const legend = document.getElementById('legend');
+  const legendItems = document.getElementById('legend-items');
+  legendItems.innerHTML = '';
+
+  const transitPolygons = []; // one polygon per point (for intersection)
+
+  perPointResults.forEach(({ point: p, transitData, walkData }) => {
+    // Walking isochrone from origin
+    const walkFeature = walkData?.features?.[0];
+    // Transit union of destination circles
+    const transitUnion = buildTransitUnion(transitData.stops || []);
+
+    // Combine walk + transit into one polygon for this point
+    let combined = walkFeature || null;
+    if (transitUnion && combined) {
+      try { combined = turf.union(combined, transitUnion) || combined; } catch (_) {}
+    } else if (transitUnion) {
+      combined = transitUnion;
+    }
+
+    if (!combined) return;
+    transitPolygons.push(combined);
+
+    // Draw walk zone (dashed, dim)
+    if (walkFeature) {
+      const walkLayer = L.geoJSON(walkFeature, {
+        style: { fillColor: p.color, fillOpacity: 0.08, color: p.color, weight: 1.5, opacity: 0.5, dashArray: '3 5' },
+      }).addTo(map);
+      isochroneLayers.push(walkLayer);
+    }
+
+    // Draw transit union (solid, more vivid)
+    if (transitUnion) {
+      const transitLayer = L.geoJSON(transitUnion, {
+        style: { fillColor: p.color, fillOpacity: 0.18, color: p.color, weight: 2, opacity: 0.8 },
+      }).addTo(map);
+      isochroneLayers.push(transitLayer);
+    }
+
+    // Legend
+    const row = document.createElement('div');
+    row.className = 'legend-row';
+    const stopCount = transitData.stops?.length ?? 0;
+    row.innerHTML = `
+      <div class="legend-swatch" style="background:${p.color};opacity:0.7"></div>
+      <span>${escapeHtml(p.name)} <span style="color:var(--muted);font-size:9px">(${stopCount} stops)</span></span>
+    `;
+    legendItems.appendChild(row);
+  });
+
+  // Intersection across multiple points
+  if (transitPolygons.length > 1) {
+    try {
+      let intersection = transitPolygons[0];
+      for (let i = 1; i < transitPolygons.length; i++) {
+        intersection = turf.intersect(intersection, transitPolygons[i]);
+        if (!intersection) break;
+      }
+      if (intersection) {
+        const intLayer = L.geoJSON(intersection, {
+          style: { fillColor: '#ffdc32', fillOpacity: 0.45, color: '#ffdc32', weight: 2.5, opacity: 0.95 },
+        }).addTo(map);
+        isochroneLayers.push(intLayer);
+        document.getElementById('legend-intersection').style.display = 'flex';
+      } else {
+        document.getElementById('legend-intersection').style.display = 'none';
+        setStatus('No common reachable area found', false, true);
+      }
+    } catch (_) {
+      document.getElementById('legend-intersection').style.display = 'none';
+    }
+  } else {
+    document.getElementById('legend-intersection').style.display = 'none';
+  }
+
+  if (isochroneLayers.length) {
+    map.fitBounds(L.featureGroup(isochroneLayers).getBounds().pad(0.1));
+  }
+  legend.classList.add('visible');
+  const total = perPointResults.reduce((s, r) => s + (r.transitData.stops?.length ?? 0), 0);
+  setStatus(`🚆 ${total} reachable stops within ${timeMinutes} min`);
 }
 
 async function fetchIsochrone(lat, lng, mode, seconds) {
