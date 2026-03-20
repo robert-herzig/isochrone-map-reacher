@@ -639,6 +639,10 @@
       background: #1a1f28;
     }
 
+    .leaflet-tile-pane {
+      filter: brightness(1.6) saturate(0.85);
+    }
+
     .leaflet-control-zoom {
       border: 1px solid var(--border) !important;
       border-radius: var(--radius) !important;
@@ -724,52 +728,112 @@
       flex-shrink: 0;
     }
 
-    /* ─── API KEY NOTICE ─── */
-    #api-notice {
-      background: rgba(245, 90, 140, 0.1);
-      border: 1px solid rgba(245, 90, 140, 0.3);
+    /* ─── GEOCODING SEARCH ─── */
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 10px 12px;
-      font-size: 10px;
-      color: var(--accent3);
-      line-height: 1.5;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 9px 36px 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .search-input:focus { border-color: var(--accent2); }
+    .search-input::placeholder { color: var(--muted); }
+
+    .search-icon {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .search-spinner {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 12px;
+      border: 1.5px solid var(--border);
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
       display: none;
     }
 
-    #api-notice.visible { display: block; }
-    #api-notice a { color: var(--accent3); }
+    .search-spinner.active { display: block; }
 
-    /* ─── API KEY INPUT ─── */
-    .api-key-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 6px;
+    .search-results {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      z-index: 200;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      display: none;
     }
 
-    .api-key-input {
-      flex: 1;
-      background: var(--bg);
-      border: 1px solid rgba(245, 90, 140, 0.4);
-      border-radius: 6px;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 6px 10px;
-      outline: none;
-    }
+    .search-results.open { display: block; }
 
-    .api-key-input:focus { border-color: var(--accent3); }
-
-    .api-key-save {
-      background: rgba(245, 90, 140, 0.15);
-      border: 1px solid rgba(245, 90, 140, 0.4);
-      border-radius: 6px;
-      color: var(--accent3);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 6px 10px;
+    .search-result-item {
+      padding: 9px 12px;
+      font-size: 11px;
       cursor: pointer;
-      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      transition: background 0.1s;
+    }
+
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: var(--surface2); }
+
+    .search-result-name {
+      flex: 1;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .search-result-type {
+      font-size: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .search-result-add {
+      font-size: 9px;
+      color: var(--accent2);
+      margin-top: 3px;
+      display: none;
+    }
+
+    .search-result-item:hover .search-result-add { display: block; }
+
+    .search-no-results {
+      padding: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
     }
 
     /* ─── EMPTY STATE ─── */
@@ -839,12 +903,15 @@
 
     <div class="sidebar-body">
 
-      <!-- API Key Notice -->
-      <div id="api-notice">
-        <strong>API key needed.</strong> This tool uses <a href="https://openrouteservice.org/dev/#/signup" target="_blank">OpenRouteService</a> (free). Get your key and enter it below.<br />
-        <div class="api-key-row">
-          <input class="api-key-input" id="api-key-input" type="password" placeholder="Paste ORS API key…" />
-          <button class="api-key-save" onclick="saveApiKey()">Save</button>
+      <!-- Geocoding Search -->
+      <div>
+        <div class="section-label">Search place</div>
+        <div class="search-wrap">
+          <input class="search-input" id="search-input" type="text" placeholder="City, address, landmark…"
+            autocomplete="off" spellcheck="false" />
+          <span class="search-icon">⌕</span>
+          <div class="search-spinner" id="search-spinner"></div>
+          <div class="search-results" id="search-results"></div>
         </div>
       </div>
 
@@ -967,7 +1034,7 @@
 // STATE
 // ═══════════════════════════════════════════════
 const POINT_COLORS = ['#c8f55a', '#5af5c8', '#f55a8c', '#f5c85a', '#8c5af5', '#5a8cf5'];
-const ORS_BASE = 'https://api.openrouteservice.org/v2/isochrones/';
+const ORS_PROXY = '/map-tool/api/isochrones/';
 
 let points = [];           // { id, name, lat, lng, marker, labelMarker }
 let isochroneLayers = [];  // Leaflet layers currently on map
@@ -975,7 +1042,6 @@ let addMode = false;
 let pendingPoint = null;   // { lat, lng } waiting for name
 let selectedMode = 'cycling-regular';
 let timeMinutes = 15;
-let apiKey = localStorage.getItem('ors_api_key') || '';
 let sessions = JSON.parse(localStorage.getItem('maptool_sessions') || '[]');
 
 // ═══════════════════════════════════════════════
@@ -995,28 +1061,108 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 map.on('click', onMapClick);
 
 // ═══════════════════════════════════════════════
-// API KEY
+// GEOCODING SEARCH (Nominatim)
 // ═══════════════════════════════════════════════
-function checkApiKey() {
-  const notice = document.getElementById('api-notice');
-  if (!apiKey) {
-    notice.classList.add('visible');
-    document.getElementById('api-key-input').value = '';
-  } else {
-    notice.classList.remove('visible');
+let searchDebounce = null;
+let searchFlyMarker = null;
+
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+const searchSpinner = document.getElementById('search-spinner');
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  if (q.length < 3) { closeSearch(); return; }
+  searchDebounce = setTimeout(() => geocode(q), 350);
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSearch();
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) closeSearch();
+});
+
+async function geocode(q) {
+  searchSpinner.classList.add('active');
+  searchResults.classList.remove('open');
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=${encodeURIComponent(q)}`;
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const results = await resp.json();
+    renderSearchResults(results);
+  } catch (_) {
+    searchResults.innerHTML = '<div class="search-no-results">Search unavailable</div>';
+    searchResults.classList.add('open');
+  } finally {
+    searchSpinner.classList.remove('active');
   }
 }
 
-function saveApiKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (!val) return;
-  apiKey = val;
-  localStorage.setItem('ors_api_key', apiKey);
-  checkApiKey();
-  setStatus('API key saved ✓', false);
+function renderSearchResults(results) {
+  if (!results.length) {
+    searchResults.innerHTML = '<div class="search-no-results">No results found</div>';
+    searchResults.classList.add('open');
+    return;
+  }
+  searchResults.innerHTML = results.map((r, i) => {
+    const type = (r.type || r.class || '').replace(/_/g, ' ');
+    const name = r.display_name;
+    return `<div class="search-result-item" onclick="selectSearchResult(${i})" data-idx="${i}">
+      <div style="flex:1">
+        <div class="search-result-name">${escapeHtml(name)}</div>
+        <div class="search-result-type">${escapeHtml(type)}</div>
+        <div class="search-result-add">+ Add point here</div>
+      </div>
+    </div>`;
+  }).join('');
+  searchResults.dataset.results = JSON.stringify(results);
+  searchResults.classList.add('open');
 }
 
-checkApiKey();
+function selectSearchResult(idx) {
+  const results = JSON.parse(searchResults.dataset.results || '[]');
+  const r = results[idx];
+  if (!r) return;
+  const lat = parseFloat(r.lat);
+  const lng = parseFloat(r.lon);
+
+  // Remove previous fly marker
+  if (searchFlyMarker) { searchFlyMarker.remove(); searchFlyMarker = null; }
+
+  // Fly to location
+  map.flyTo([lat, lng], 13, { duration: 1.2 });
+
+  // Temporary pin marker
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:12px;height:12px;border-radius:50%;background:var(--accent2);border:2px solid white;box-shadow:0 0 0 4px rgba(90,245,200,0.25);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+  searchFlyMarker = L.marker([lat, lng], { icon }).addTo(map)
+    .bindTooltip('Click "+ Click map to place point" then click here, or click this pin to add', { permanent: false });
+
+  // Clicking the temporary pin opens the name modal directly
+  searchFlyMarker.on('click', () => {
+    pendingPoint = { lat, lng };
+    if (searchFlyMarker) { searchFlyMarker.remove(); searchFlyMarker = null; }
+    openModal();
+  });
+
+  // Pre-fill modal name with the place name (short version)
+  const shortName = r.name || r.display_name.split(',')[0];
+  document.getElementById('modal-name-input').value = shortName;
+
+  searchInput.value = r.display_name.split(',').slice(0, 2).join(',');
+  closeSearch();
+}
+
+function closeSearch() {
+  searchResults.classList.remove('open');
+}
 
 // ═══════════════════════════════════════════════
 // MAP INTERACTIONS
@@ -1196,11 +1342,6 @@ function updateCalcBtn() {
 // ═══════════════════════════════════════════════
 async function calculate() {
   if (points.length === 0) return;
-  if (!apiKey) {
-    document.getElementById('api-notice').classList.add('visible');
-    setStatus('Enter your ORS API key first', true);
-    return;
-  }
 
   const btn = document.getElementById('calc-btn');
   btn.disabled = true;
@@ -1224,7 +1365,7 @@ async function calculate() {
 }
 
 async function fetchIsochrone(lat, lng, mode, seconds) {
-  const url = `${ORS_BASE}${encodeURIComponent(mode)}`;
+  const url = `${ORS_PROXY}${encodeURIComponent(mode)}`;
   const body = {
     locations: [[lng, lat]],
     range: [seconds],
@@ -1235,9 +1376,8 @@ async function fetchIsochrone(lat, lng, mode, seconds) {
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': apiKey,
       'Content-Type': 'application/json',
-      'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+      'Accept': 'application/json',
     },
     body: JSON.stringify(body),
   });

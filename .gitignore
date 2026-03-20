@@ -1,3 +1,7 @@
 .DS_Store
 *.swp
 *.swo
+
+# Proxy secrets — never commit
+proxy/.env
+proxy/node_modules/
